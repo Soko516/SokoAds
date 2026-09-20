@@ -9,12 +9,12 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 const ADS_FILE = path.join(DATA_DIR, 'ads.json');
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-const PESAPAL_ENV = (process.env.PESAPAL_ENV || 'SANDBOX').toUpperCase();
-const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
+const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || '');
+const PESAPAL_ENV = String(process.env.PESAPAL_ENV || 'SANDBOX').toUpperCase();
+const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
 
 if (!['SANDBOX', 'LIVE'].includes(PESAPAL_ENV)) throw new Error('PESAPAL_ENV must be SANDBOX or LIVE.');
-if (PESAPAL_ENV === 'LIVE' && (!ADMIN_PASSWORD || ADMIN_PASSWORD.length < 12)) {
+if (PESAPAL_ENV === 'LIVE' && ADMIN_PASSWORD.length < 12) {
   throw new Error('Set ADMIN_PASSWORD to at least 12 characters before running LIVE.');
 }
 
@@ -22,50 +22,79 @@ function ensureDataFile() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(ADS_FILE)) fs.writeFileSync(ADS_FILE, '[]\n', 'utf8');
 }
+
 function readAds() {
   ensureDataFile();
   try {
     const value = JSON.parse(fs.readFileSync(ADS_FILE, 'utf8') || '[]');
     return Array.isArray(value) ? value : [];
-  } catch (_) { return []; }
+  } catch (error) {
+    console.error('Could not read ads database:', error.message);
+    return [];
+  }
 }
+
 function writeAds(ads) {
   ensureDataFile();
   const temp = `${ADS_FILE}.tmp`;
   fs.writeFileSync(temp, JSON.stringify(ads, null, 2) + '\n', 'utf8');
   fs.renameSync(temp, ADS_FILE);
 }
+
 function text(value, fallback = '') {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback;
 }
+
 function baseUrl() {
   return PESAPAL_ENV === 'LIVE' ? 'https://pay.pesapal.com/v3' : 'https://cybqa.pesapal.com/pesapalv3';
 }
+
 function adminOnly(req, res, next) {
-  if (!ADMIN_PASSWORD || req.get('x-admin-password') !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Invalid admin password.' });
+  if (!ADMIN_PASSWORD || req.get('x-admin-password') !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Invalid admin password.' });
+  }
   next();
 }
+
 async function pesapalRequest(endpoint, options = {}) {
   const response = await fetch(`${baseUrl()}${endpoint}`, options);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || data.message || `PesaPal request failed (${response.status}).`);
   return data;
 }
+
 async function token() {
   const key = process.env.PESAPAL_CONSUMER_KEY;
   const secret = process.env.PESAPAL_CONSUMER_SECRET;
   if (!key || !secret) throw new Error('PesaPal credentials are not configured.');
-  const data = await pesapalRequest('/api/Auth/RequestToken', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consumer_key: key, consumer_secret: secret }) });
+  const data = await pesapalRequest('/api/Auth/RequestToken', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ consumer_key: key, consumer_secret: secret })
+  });
   const value = data.token || data.access_token || data.Token;
   if (!value) throw new Error('PesaPal did not return an access token.');
   return value;
 }
+
 function authorized(endpoint, accessToken, options = {}) {
-  return pesapalRequest(endpoint, { ...options, headers: { ...(options.headers || {}), Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } });
+  return pesapalRequest(endpoint, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    }
+  });
 }
+
 async function transactionStatus(orderTrackingId) {
-  return authorized(`/api/Transactions/GetTransactionStatus?orderTrackingId=${encodeURIComponent(orderTrackingId)}`, await token());
+  return authorized(
+    `/api/Transactions/GetTransactionStatus?orderTrackingId=${encodeURIComponent(orderTrackingId)}`,
+    await token()
+  );
 }
+
 function paymentStatus(data) {
   const code = Number(data.status_code ?? data.statusCode);
   const value = String(data.payment_status_description || data.paymentStatusDescription || data.status || '').toLowerCase();
@@ -73,70 +102,157 @@ function paymentStatus(data) {
   if (code === 2 || code === 3 || ['failed', 'reversed', 'cancelled', 'canceled'].includes(value)) return 'Failed';
   return 'Pending';
 }
+
 async function verifyAndSave(trackingId, reference) {
   const result = await transactionStatus(trackingId);
   const status = paymentStatus(result);
-  writeAds(readAds().map((ad) => ad.orderReference === reference ? { ...ad, status, orderTrackingId: trackingId, paymentStatus: result } : ad));
+  const ads = readAds();
+  const index = ads.findIndex((ad) => ad.orderReference === reference);
+  if (index >= 0) {
+    ads[index] = { ...ads[index], status, orderTrackingId: trackingId, paymentStatus: result };
+    writeAds(ads);
+  }
   return { status, ...result };
 }
 
-app.use(express.json({ limit: '5mb' }));
-app.get('/health', (req, res) => res.json({ ok: true, status: 'healthy', env: PESAPAL_ENV, paymentConfigured: !!(process.env.PESAPAL_CONSUMER_KEY && process.env.PESAPAL_CONSUMER_SECRET), ipnConfigured: !!process.env.PESAPAL_IPN_ID, time: new Date().toISOString() }));
-app.get('/api/ads', (req, res) => res.json(readAds().map(({ paymentStatus: _, ...ad }) => ad)));
+app.disable('x-powered-by');
+app.use(express.json({ limit: '1mb' }));
+
+app.get('/health', (req, res) => res.json({
+  ok: true,
+  status: 'healthy',
+  env: PESAPAL_ENV,
+  paymentConfigured: Boolean(process.env.PESAPAL_CONSUMER_KEY && process.env.PESAPAL_CONSUMER_SECRET),
+  ipnConfigured: Boolean(process.env.PESAPAL_IPN_ID)
+}));
+
+app.get('/api/ads', (req, res) => {
+  res.json(readAds().map(({ paymentStatus: _, ...ad }) => ad));
+});
 
 app.post('/api/ads', (req, res) => {
   const body = req.body || {};
-  const ad = { id: `ad-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: text(body.name, 'Untitled ad'), price: Number(body.price), category: text(body.category, 'General'), phone: text(body.phone), desc: text(body.desc), image: text(body.image), featured: !!body.featured, status: 'Pending', createdAt: new Date().toISOString() };
-  if (!ad.name || !ad.phone || !Number.isFinite(ad.price) || ad.price <= 0) return res.status(400).json({ error: 'Name, phone, and a positive price are required.' });
-  const ads = readAds(); ads.unshift(ad); writeAds(ads); return res.status(201).json(ad);
+  const ad = {
+    id: `ad-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: text(body.name),
+    price: Number(body.price),
+    category: text(body.category, 'General'),
+    phone: text(body.phone),
+    desc: text(body.desc, ''),
+    image: text(body.image, ''),
+    featured: Boolean(body.featured),
+    status: 'Pending',
+    createdAt: new Date().toISOString()
+  };
+  if (!ad.name || !ad.phone || !Number.isFinite(ad.price) || ad.price <= 0) {
+    return res.status(400).json({ error: 'Name, phone, and a positive price are required.' });
+  }
+  const ads = readAds();
+  ads.unshift(ad);
+  writeAds(ads);
+  return res.status(201).json(ad);
 });
+
 app.get('/api/admin/ads', adminOnly, (req, res) => res.json(readAds()));
 
 app.post('/api/pesapal/register-ipn', adminOnly, async (req, res) => {
   try {
-    const data = await authorized('/api/URLSetup/RegisterIPN', await token(), { method: 'POST', body: JSON.stringify({ url: `${PUBLIC_BASE_URL}/api/pesapal/ipn`, ipn_notification_type: 'POST' }) });
+    const data = await authorized('/api/URLSetup/RegisterIPN', await token(), {
+      method: 'POST',
+      body: JSON.stringify({ url: `${PUBLIC_BASE_URL}/api/pesapal/ipn`, ipn_notification_type: 'POST' })
+    });
     const ipnId = data.ipn_id || data.ipnId || data.id;
     if (!ipnId) throw new Error('PesaPal did not return an IPN ID.');
     return res.json({ ok: true, ipn_id: ipnId, message: 'Save this value as PESAPAL_IPN_ID and restart the service.' });
-  } catch (error) { return res.status(502).json({ ok: false, error: error.message }); }
+  } catch (error) {
+    return res.status(502).json({ ok: false, error: error.message });
+  }
 });
 
 app.post('/api/pesapal/pay', async (req, res) => {
   const body = req.body || {};
-  const adId = text(body.adId);
-  const ad = readAds().find((item) => item.id === adId);
+  const ad = readAds().find((item) => item.id === text(body.adId));
   if (!ad) return res.status(404).json({ error: 'Advertisement not found.' });
   if (!process.env.PESAPAL_IPN_ID) return res.status(503).json({ error: 'Payment is not configured: register the PesaPal IPN first.' });
+
   try {
     const reference = `SOKO-${Date.now()}-${ad.id.slice(-8)}`;
-    const packageType = text(body.packageType, 'Basic');
-    const amount = packageType.toLowerCase() === 'featured' ? 5000 : 2000;
-    const payload = { id: reference, currency: 'TZS', amount: amount.toFixed(2), description: `SokoAds ${packageType} advertising package`, callback_url: `${PUBLIC_BASE_URL}/api/pesapal/callback`, cancellation_url: `${PUBLIC_BASE_URL}/`, notification_id: process.env.PESAPAL_IPN_ID, billing_address: { email_address: text(body.email, 'noreply@example.com'), phone_number: text(body.phone, ad.phone), country_code: 'TZ', first_name: text(body.firstName, 'Customer'), last_name: text(body.lastName, 'User') } };
-    const data = await authorized('/api/Transactions/SubmitOrderRequest', await token(), { method: 'POST', body: JSON.stringify(payload) });
+    const packageType = text(body.packageType, 'Basic').toLowerCase() === 'featured' ? 'Featured' : 'Basic';
+    const amount = packageType === 'Featured' ? 5000 : 2000;
+    const payload = {
+      id: reference,
+      currency: 'TZS',
+      amount: amount.toFixed(2),
+      description: `SokoAds ${packageType} advertising package`,
+      callback_url: `${PUBLIC_BASE_URL}/api/pesapal/callback`,
+      notification_id: process.env.PESAPAL_IPN_ID,
+      billing_address: {
+        email_address: text(body.email, 'customer@example.com'),
+        phone_number: text(body.phone, ad.phone),
+        first_name: text(body.firstName, 'SokoAds'),
+        last_name: text(body.lastName, 'Customer')
+      }
+    };
+    const data = await authorized('/api/Transactions/SubmitOrderRequest', await token(), {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
     const redirectUrl = data.redirect_url || data.redirectUrl;
     if (!redirectUrl) throw new Error('PesaPal returned no redirect URL.');
-    writeAds(readAds().map((item) => item.id === ad.id ? { ...item, orderReference: reference, status: 'Awaiting payment', packageType, packageAmount: amount } : item));
+    writeAds(readAds().map((item) => item.id === ad.id
+      ? { ...item, orderReference: reference, status: 'Awaiting payment', packageType, packageAmount: amount }
+      : item));
     return res.json({ ok: true, orderId: data.order_tracking_id || data.orderTrackingId || reference, orderReference: reference, redirect_url: redirectUrl });
-  } catch (error) { return res.status(502).json({ ok: false, error: error.message || 'Payment request failed.' }); }
+  } catch (error) {
+    return res.status(502).json({ ok: false, error: error.message || 'Payment request failed.' });
+  }
 });
 
 app.get('/api/pesapal/status', async (req, res) => {
   const trackingId = text(req.query.OrderTrackingId || req.query.orderTrackingId);
   if (!trackingId) return res.status(400).json({ error: 'Missing OrderTrackingId.' });
-  try { return res.json(await transactionStatus(trackingId)); } catch (error) { return res.status(502).json({ error: error.message }); }
+  try {
+    return res.json(await transactionStatus(trackingId));
+  } catch (error) {
+    return res.status(502).json({ error: error.message });
+  }
 });
 
+function paymentData(req) {
+  return { ...(req.query || {}), ...(req.body || {}) };
+}
+
 async function paymentNotification(req, res) {
-  const data = { ...(req.query || {}), ...(req.body || {}) };
+  const data = paymentData(req);
   const trackingId = text(data.OrderTrackingId || data.order_tracking_id || data.orderTrackingId);
   const reference = text(data.OrderMerchantReference || data.order_merchant_reference || data.orderReference || data.order_reference);
   if (!trackingId || !reference) return res.status(400).send('Missing payment reference.');
-  try { await verifyAndSave(trackingId, reference); return res.status(200).send('OK'); }
-  catch (error) { console.error('PesaPal verification failed:', error.message); return res.status(502).send('Verification failed'); }
+  try {
+    const result = await verifyAndSave(trackingId, reference);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('PesaPal verification failed:', error.message);
+    return res.status(502).send('Verification failed');
+  }
 }
-app.get('/api/pesapal/callback', paymentNotification);
-app.post('/api/pesapal/callback', paymentNotification);
+
+async function paymentCallback(req, res) {
+  const data = paymentData(req);
+  const trackingId = text(data.OrderTrackingId || data.order_tracking_id || data.orderTrackingId);
+  const reference = text(data.OrderMerchantReference || data.order_merchant_reference || data.orderReference || data.order_reference);
+  if (!trackingId || !reference) return res.redirect('/payment-success.html');
+  try {
+    await verifyAndSave(trackingId, reference);
+  } catch (error) {
+    console.error('PesaPal callback verification failed:', error.message);
+  }
+  return res.redirect(`/payment-success.html?OrderTrackingId=${encodeURIComponent(trackingId)}`);
+}
+
+app.get('/api/pesapal/callback', paymentCallback);
+app.post('/api/pesapal/callback', paymentCallback);
 app.post('/api/pesapal/ipn', paymentNotification);
-app.use(express.static(__dirname));
+app.use(express.static(__dirname, { extensions: ['html'] }));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
 app.listen(PORT, () => console.log(`SokoAds listening on port ${PORT} (${PESAPAL_ENV})`));

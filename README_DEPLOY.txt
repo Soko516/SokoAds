@@ -1,26 +1,18 @@
 # SokoAds deployment
 
-## Required production configuration
+## Production checklist
 
-Set these variables in your hosting provider. Never commit credentials:
+Configure these environment variables in Render (never commit real credentials):
 
-- `PESAPAL_ENV=LIVE` (use `SANDBOX` while testing)
+- `PESAPAL_ENV=SANDBOX` until the complete payment flow is tested; use `LIVE` only afterward.
 - `PESAPAL_CONSUMER_KEY`
 - `PESAPAL_CONSUMER_SECRET`
-- `PUBLIC_BASE_URL=https://your-real-domain.example`
+- `PUBLIC_BASE_URL=https://your-real-domain.example` (no trailing slash)
 - `ADMIN_PASSWORD` (at least 12 random characters)
 - `PESAPAL_IPN_ID`
 
-The app exposes `/health`. It must report `env: LIVE`, `paymentConfigured: true`, and `ipnConfigured: true` before accepting live payments.
+After deployment, open `/health`. Before live payments it must report `ok: true`, `paymentConfigured: true`, and `ipnConfigured: true`. Register the IPN from the Admin section, save the returned ID as `PESAPAL_IPN_ID`, then restart the service.
 
-### Connect PesaPal
+Test a small sandbox payment and verify the redirect, callback, IPN, and status confirmation. The server verifies transaction status with PesaPal before changing an ad to `Paid`.
 
-1. Deploy the service with a public HTTPS URL.
-2. Open `/health` and confirm the service is healthy.
-3. Log in to the Admin section and click **Register PesaPal IPN**.
-4. Save the returned `ipn_id` as `PESAPAL_IPN_ID` in the host's environment settings, then redeploy/restart.
-5. Make one small sandbox payment first. Switch to `LIVE` only after the complete redirect, callback, IPN, and status-verification flow succeeds.
-
-The server never trusts a browser callback as proof of payment. It calls PesaPal `GetTransactionStatus` before changing an ad to `Paid`.
-
-The JSON file database is suitable only for a single small instance. Use PostgreSQL or another durable database and object storage before significant production traffic; free hosting may lose local files on restart.
+The JSON file database is suitable only for a small single instance. Use PostgreSQL and object storage before significant production traffic; free hosting may lose local files.
