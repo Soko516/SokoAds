@@ -155,6 +155,45 @@ app.post('/api/ads', (req, res) => {
 
 app.get('/api/admin/ads', adminOnly, (req, res) => res.json(readAds()));
 
+app.get('/api/admin/stats', adminOnly, (req, res) => {
+  const ads = readAds();
+  const paid = ads.filter((ad) => ad.status === 'Paid');
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startWeek = new Date(startToday);
+  startWeek.setDate(startToday.getDate() - startToday.getDay());
+  const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const revenue = (list) => list.reduce((sum, ad) => sum + Number(ad.packageAmount || (String(ad.packageType).toLowerCase() === 'featured' ? 5000 : 2000)), 0);
+  const created = (ad) => new Date(ad.createdAt || 0);
+  res.json({
+    ok: true,
+    currency: 'TZS',
+    totals: {
+      revenue: revenue(paid),
+      paidAds: paid.length,
+      featuredPaid: paid.filter((ad) => String(ad.packageType).toLowerCase() === 'featured').length,
+      basicPaid: paid.filter((ad) => String(ad.packageType).toLowerCase() !== 'featured').length,
+      totalAds: ads.length,
+      pendingAds: ads.filter((ad) => ad.status !== 'Paid').length
+    },
+    periods: {
+      today: revenue(paid.filter((ad) => created(ad) >= startToday)),
+      week: revenue(paid.filter((ad) => created(ad) >= startWeek)),
+      month: revenue(paid.filter((ad) => created(ad) >= startMonth))
+    },
+    transactions: paid.slice(0, 100).map((ad) => ({
+      id: ad.id,
+      name: ad.name,
+      packageType: ad.packageType || (ad.featured ? 'Featured' : 'Basic'),
+      amount: Number(ad.packageAmount || (ad.featured ? 5000 : 2000)),
+      status: ad.status,
+      orderReference: ad.orderReference || '',
+      orderTrackingId: ad.orderTrackingId || '',
+      createdAt: ad.createdAt || ''
+    }))
+  });
+});
+
 app.post('/api/pesapal/register-ipn', adminOnly, async (req, res) => {
   try {
     const data = await authorized('/api/URLSetup/RegisterIPN', await token(), {
