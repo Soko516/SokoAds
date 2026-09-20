@@ -1,17 +1,13 @@
-services:
-  - type: web
-    name: sokoads-pesapal
-    runtime: node
-    plan: free
-    buildCommand: npm install
-    startCommand: npm start
-    healthCheckPath: /health
-    envVars:
-      - key: PESAPAL_ENV
-        value: SANDBOX
-      - key: PESAPAL_CONSUMER_KEY
-        sync: false
-      - key: PESAPAL_CONSUMER_SECRET
-        sync: false
-      - key: ADMIN_PASSWORD
-        sync: false
+PORT=3000
+PUBLIC_BASE_URL=https://your-domain.com
+PESAPAL_ENV=SANDBOX
+PESAPAL_CONSUMER_KEY=your_consumer_key
+PESAPAL_CONSUMER_SECRET=your_consumer_secret
+PESAPAL_IPN_ID=your_ipn_id
+ADMIN_PASSWORD=changeThisPassword
+
+# LIVE EXAMPLE:
+# PESAPAL_ENV=LIVE
+# PUBLIC_BASE_URL=https://your-live-domain.com
+# PESAPAL_CONSUMER_KEY=live_key
+# PESAPAL_CONSUMER_SECRET=live_secret

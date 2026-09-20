@@ -1,1 +1,42 @@
-<!doctype html><html lang="sw"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SokoAds - Payment</title><style>body{font-family:Arial,sans-serif;background:#f5f7fb;margin:0;padding:30px}.box{max-width:650px;margin:60px auto;background:#fff;padding:28px;border-radius:16px;box-shadow:0 5px 25px #0001}h1{margin-top:0}.ok{font-size:22px;font-weight:700}.btn{display:inline-block;padding:12px 18px;background:#16a34a;color:white;text-decoration:none;border-radius:10px}</style></head><body><div class="box"><h1>SokoAds</h1><div id="result">Tunathibitisha malipo yako...</div><br><a class="btn" href="/">Rudi SokoAds</a></div><script>const p=new URLSearchParams(location.search),id=p.get('OrderTrackingId');async function run(){if(!id){document.getElementById('result').innerHTML='<div>Hakuna OrderTrackingId. Rudi kwenye SokoAds.</div>';return}try{const r=await fetch('/api/pesapal/status?OrderTrackingId='+encodeURIComponent(id));const d=await r.json();const ok=String(d.payment_status_description||d.status_code||d.status||'').toLowerCase();document.getElementById('result').innerHTML=(ok.includes('completed')||ok==='1'||ok.includes('paid'))?'<div class="ok">✅ Malipo yamepokelewa. Tangazo lako limeamilishwa.</div>':'<div>⏳ Malipo yako bado yanachakatwa. Unaweza kurudi SokoAds; tutasasisha status kupitia PesaPal.</div>';}catch(e){document.getElementById('result').innerHTML='<div>Hatujaweza kuthibitisha status sasa hivi. Tafadhali jaribu tena baadaye.</div>'}}run();</script></body></html>
+SOKOADS v2 — PesaPal-ready live app
+
+This project has been updated into a live marketplace app with server-side payment flow and secure environment configuration.
+
+Features:
+- Express backend with health check and public API routes
+- ads creation and listing flow
+- PesaPal API 3.0 authentication, order submission, and transaction status verification
+- callback and IPN handling
+- admin password login
+- deployment config for Render
+
+Environment variables:
+- PORT=3000
+- PUBLIC_BASE_URL=https://your-domain.com
+- PESAPAL_ENV=SANDBOX or LIVE
+- PESAPAL_CONSUMER_KEY=...
+- PESAPAL_CONSUMER_SECRET=...
+- PESAPAL_IPN_ID=...
+- ADMIN_PASSWORD=...
+
+Local run:
+1. npm install
+2. cp .env.example .env
+3. fill in your real values
+4. npm start
+5. open http://localhost:3000
+
+Production setup:
+- deploy to Render or any HTTPS Node host
+- set PUBLIC_BASE_URL to your live domain
+- register the public IPN URL in the PesaPal dashboard
+- copy the returned ipn_id into PESAPAL_IPN_ID
+- switch PESAPAL_ENV=LIVE and use live credentials only for production
+
+Important:
+- never put consumer secret or payment credentials in browser code
+- use HTTPS in production
+- live payments will only succeed when the app is deployed on a public HTTPS URL and the real PesaPal keys are configured
+
+PesaPal docs:
+https://developer.pesapal.com/
