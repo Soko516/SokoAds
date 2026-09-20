@@ -1,1 +1,14 @@
-
+[
+  {
+    "id": "demo-ad-001",
+    "name": "Demo listing",
+    "price": 2000,
+    "category": "Electronics",
+    "phone": "255700000001",
+    "desc": "Sample listing to get the marketplace running.",
+    "image": "",
+    "featured": false,
+    "status": "Pending",
+    "createdAt": "2026-09-20T00:00:00.000Z"
+  }
+]
