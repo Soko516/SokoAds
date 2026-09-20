@@ -1,13 +1,14 @@
 {
-  "name": "SokoAds Tanzania",
+  "name": "SokoAds — Marketplace Tanzania",
   "short_name": "SokoAds",
+  "description": "Marketplace ya Tanzania ya kununua, kuuza na kutangaza bidhaa na huduma.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#f5f7fb",
+  "orientation": "portrait-primary",
+  "background_color": "#111827",
   "theme_color": "#111827",
-  "description": "Marketplace ya Tanzania ya bidhaa na huduma.",
-  "icons": [
-    {"src":"/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
-    {"src":"/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
-  ]
+  "lang": "sw-TZ",
+  "categories": ["shopping", "business"],
+  "icons": [{"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}]
 }
