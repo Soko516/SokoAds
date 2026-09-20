@@ -1,22 +1,26 @@
-SokoAds Render deployment
+# SokoAds deployment
 
-IMPORTANT: The current Render URL showing "Not Found" / "Hello, World!" indicates Render is serving a different starter service/repository, not this SokoAds project. This package is ready for a Node Web Service.
+## Required production configuration
 
-Render settings:
-- Runtime: Node
-- Build Command: npm install
-- Start Command: npm start
-- Health Check Path: /health
-- Root Directory: leave blank (project files must be at repository root)
+Set these variables in your hosting provider. Never commit credentials:
 
-Environment variables:
-- PESAPAL_ENV=SANDBOX
-- PESAPAL_CONSUMER_KEY=your key
-- PESAPAL_CONSUMER_SECRET=your secret
-- ADMIN_PASSWORD=your admin password
+- `PESAPAL_ENV=LIVE` (use `SANDBOX` while testing)
+- `PESAPAL_CONSUMER_KEY`
+- `PESAPAL_CONSUMER_SECRET`
+- `PUBLIC_BASE_URL=https://your-real-domain.example`
+- `ADMIN_PASSWORD` (at least 12 random characters)
+- `PESAPAL_IPN_ID`
 
-After deploy, test:
-- https://YOUR-SERVICE.onrender.com/health
-- https://YOUR-SERVICE.onrender.com/
+The app exposes `/health`. It must report `env: LIVE`, `paymentConfigured: true`, and `ipnConfigured: true` before accepting live payments.
 
-Do not use the Render "Hello World" starter repository for this service.
+### Connect PesaPal
+
+1. Deploy the service with a public HTTPS URL.
+2. Open `/health` and confirm the service is healthy.
+3. Log in to the Admin section and click **Register PesaPal IPN**.
+4. Save the returned `ipn_id` as `PESAPAL_IPN_ID` in the host's environment settings, then redeploy/restart.
+5. Make one small sandbox payment first. Switch to `LIVE` only after the complete redirect, callback, IPN, and status-verification flow succeeds.
+
+The server never trusts a browser callback as proof of payment. It calls PesaPal `GetTransactionStatus` before changing an ad to `Paid`.
+
+The JSON file database is suitable only for a single small instance. Use PostgreSQL or another durable database and object storage before significant production traffic; free hosting may lose local files on restart.
