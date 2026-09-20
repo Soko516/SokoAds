@@ -12,11 +12,10 @@ const ADS_FILE = path.join(DATA_DIR, 'ads.json');
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const PESAPAL_ENV = (process.env.PESAPAL_ENV || 'SANDBOX').toUpperCase();
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
-const VALID_ENVIRONMENTS = new Set(['SANDBOX', 'LIVE']);
 
-if (!VALID_ENVIRONMENTS.has(PESAPAL_ENV)) throw new Error('PESAPAL_ENV must be SANDBOX or LIVE.');
+if (!['SANDBOX', 'LIVE'].includes(PESAPAL_ENV)) throw new Error('PESAPAL_ENV must be SANDBOX or LIVE.');
 if (PESAPAL_ENV === 'LIVE' && (!ADMIN_PASSWORD || ADMIN_PASSWORD.length < 12)) {
-  throw new Error('Set ADMIN_PASSWORD to a random value of at least 12 characters before running LIVE.');
+  throw new Error('Set ADMIN_PASSWORD to at least 12 characters before running LIVE.');
 }
 
 function ensureDataFile() {
@@ -26,8 +25,8 @@ function ensureDataFile() {
 function readAds() {
   ensureDataFile();
   try {
-    const parsed = JSON.parse(fs.readFileSync(ADS_FILE, 'utf8') || '[]');
-    return Array.isArray(parsed) ? parsed : [];
+    const value = JSON.parse(fs.readFileSync(ADS_FILE, 'utf8') || '[]');
+    return Array.isArray(value) ? value : [];
   } catch (_) { return []; }
 }
 function writeAds(ads) {
@@ -39,7 +38,7 @@ function writeAds(ads) {
 function text(value, fallback = '') {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback;
 }
-function pesapalBaseUrl() {
+function baseUrl() {
   return PESAPAL_ENV === 'LIVE' ? 'https://pay.pesapal.com/v3' : 'https://cybqa.pesapal.com/pesapalv3';
 }
 function adminOnly(req, res, next) {
@@ -47,67 +46,59 @@ function adminOnly(req, res, next) {
   next();
 }
 async function pesapalRequest(endpoint, options = {}) {
-  const response = await fetch(`${pesapalBaseUrl()}${endpoint}`, options);
+  const response = await fetch(`${baseUrl()}${endpoint}`, options);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || data.message || `PesaPal request failed (${response.status}).`);
   return data;
 }
-async function requestPesapalToken() {
+async function token() {
   const key = process.env.PESAPAL_CONSUMER_KEY;
   const secret = process.env.PESAPAL_CONSUMER_SECRET;
   if (!key || !secret) throw new Error('PesaPal credentials are not configured.');
-  const data = await pesapalRequest('/api/Auth/RequestToken', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ consumer_key: key, consumer_secret: secret }),
-  });
-  const token = data.token || data.access_token || data.Token;
-  if (!token) throw new Error('PesaPal did not return an access token.');
-  return token;
+  const data = await pesapalRequest('/api/Auth/RequestToken', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consumer_key: key, consumer_secret: secret }) });
+  const value = data.token || data.access_token || data.Token;
+  if (!value) throw new Error('PesaPal did not return an access token.');
+  return value;
 }
-async function authenticatedRequest(endpoint, token, options = {}) {
-  return pesapalRequest(endpoint, { ...options, headers: { ...(options.headers || {}), Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
+function authorized(endpoint, accessToken, options = {}) {
+  return pesapalRequest(endpoint, { ...options, headers: { ...(options.headers || {}), Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } });
 }
-async function getTransactionStatus(orderTrackingId) {
-  const token = await requestPesapalToken();
-  return authenticatedRequest(`/api/Transactions/GetTransactionStatus?orderTrackingId=${encodeURIComponent(orderTrackingId)}`, token);
+async function transactionStatus(orderTrackingId) {
+  return authorized(`/api/Transactions/GetTransactionStatus?orderTrackingId=${encodeURIComponent(orderTrackingId)}`, await token());
 }
-function statusName(data) {
+function paymentStatus(data) {
   const code = Number(data.status_code ?? data.statusCode);
   const value = String(data.payment_status_description || data.paymentStatusDescription || data.status || '').toLowerCase();
   if (code === 1 || ['completed', 'paid', 'success', 'successful'].includes(value)) return 'Paid';
   if (code === 2 || code === 3 || ['failed', 'reversed', 'cancelled', 'canceled'].includes(value)) return 'Failed';
   return 'Pending';
 }
-async function reconcilePayment(orderTrackingId, merchantReference) {
-  if (!orderTrackingId || !merchantReference) return 'Pending';
-  const result = await getTransactionStatus(orderTrackingId);
-  const status = statusName(result);
-  const ads = readAds();
-  const updated = ads.map((ad) => ad.orderReference === merchantReference ? { ...ad, status, orderTrackingId, paymentStatus: result } : ad);
-  writeAds(updated);
-  return status;
+async function verifyAndSave(trackingId, reference) {
+  const result = await transactionStatus(trackingId);
+  const status = paymentStatus(result);
+  writeAds(readAds().map((ad) => ad.orderReference === reference ? { ...ad, status, orderTrackingId: trackingId, paymentStatus: result } : ad));
+  return { status, ...result };
 }
 
 app.use(express.json({ limit: '5mb' }));
 app.get('/health', (req, res) => res.json({ ok: true, status: 'healthy', env: PESAPAL_ENV, paymentConfigured: !!(process.env.PESAPAL_CONSUMER_KEY && process.env.PESAPAL_CONSUMER_SECRET), ipnConfigured: !!process.env.PESAPAL_IPN_ID, time: new Date().toISOString() }));
-app.get('/api/ads', (req, res) => res.json(readAds().map(({ paymentStatus, ...ad }) => ad)));
+app.get('/api/ads', (req, res) => res.json(readAds().map(({ paymentStatus: _, ...ad }) => ad)));
 
 app.post('/api/ads', (req, res) => {
   const body = req.body || {};
   const ad = { id: `ad-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: text(body.name, 'Untitled ad'), price: Number(body.price), category: text(body.category, 'General'), phone: text(body.phone), desc: text(body.desc), image: text(body.image), featured: !!body.featured, status: 'Pending', createdAt: new Date().toISOString() };
   if (!ad.name || !ad.phone || !Number.isFinite(ad.price) || ad.price <= 0) return res.status(400).json({ error: 'Name, phone, and a positive price are required.' });
-  const ads = readAds(); ads.unshift(ad); writeAds(ads); res.status(201).json(ad);
+  const ads = readAds(); ads.unshift(ad); writeAds(ads); return res.status(201).json(ad);
 });
 app.get('/api/admin/ads', adminOnly, (req, res) => res.json(readAds()));
 
 app.post('/api/pesapal/register-ipn', adminOnly, async (req, res) => {
   try {
-    const token = await requestPesapalToken();
-    const data = await authenticatedRequest('/api/URLSetup/RegisterIPN', token, { method: 'POST', body: JSON.stringify({ url: `${PUBLIC_BASE_URL}/api/pesapal/ipn`, ipn_notification_type: 'POST' }) });
+    const data = await authorized('/api/URLSetup/RegisterIPN', await token(), { method: 'POST', body: JSON.stringify({ url: `${PUBLIC_BASE_URL}/api/pesapal/ipn`, ipn_notification_type: 'POST' }) });
     const ipnId = data.ipn_id || data.ipnId || data.id;
     if (!ipnId) throw new Error('PesaPal did not return an IPN ID.');
-    res.json({ ok: true, ipn_id: ipnId, message: 'Save this IPN ID as PESAPAL_IPN_ID in the deployment environment and restart.' });
-  } catch (error) { res.status(502).json({ ok: false, error: error.message }); }
+    return res.json({ ok: true, ipn_id: ipnId, message: 'Save this value as PESAPAL_IPN_ID and restart the service.' });
+  } catch (error) { return res.status(502).json({ ok: false, error: error.message }); }
 });
 
 app.post('/api/pesapal/pay', async (req, res) => {
@@ -115,17 +106,24 @@ app.post('/api/pesapal/pay', async (req, res) => {
   const adId = text(body.adId);
   const ad = readAds().find((item) => item.id === adId);
   if (!ad) return res.status(404).json({ error: 'Advertisement not found.' });
-  if (!process.env.PESAPAL_IPN_ID) return res.status(503).json({ error: 'Payment is not configured: register the PesaPal IPN and set PESAPAL_IPN_ID.' });
+  if (!process.env.PESAPAL_IPN_ID) return res.status(503).json({ error: 'Payment is not configured: register the PesaPal IPN first.' });
   try {
-    const token = await requestPesapalToken();
-    const orderReference = `SOKO-${Date.now()}-${ad.id.slice(-8)}`;
-    const payload = { id: orderReference, currency: 'TZS', amount: ad.price.toFixed(2), description: `SokoAds ad package: ${text(body.packageType, 'Basic')}`, callback_url: `${PUBLIC_BASE_URL}/api/pesapal/callback`, cancellation_url: `${PUBLIC_BASE_URL}/`, notification_id: process.env.PESAPAL_IPN_ID, billing_address: { email_address: text(body.email, 'noreply@example.com'), phone_number: text(body.phone, ad.phone), country_code: 'TZ', first_name: text(body.firstName, 'Customer'), last_name: text(body.lastName, 'User') } };
-    const data = await authenticatedRequest('/api/Transactions/SubmitOrderRequest', token, { method: 'POST', body: JSON.stringify(payload) });
+    const reference = `SOKO-${Date.now()}-${ad.id.slice(-8)}`;
+    const packageType = text(body.packageType, 'Basic');
+    const amount = packageType.toLowerCase() === 'featured' ? 5000 : 2000;
+    const payload = { id: reference, currency: 'TZS', amount: amount.toFixed(2), description: `SokoAds ${packageType} advertising package`, callback_url: `${PUBLIC_BASE_URL}/api/pesapal/callback`, cancellation_url: `${PUBLIC_BASE_URL}/`, notification_id: process.env.PESAPAL_IPN_ID, billing_address: { email_address: text(body.email, 'noreply@example.com'), phone_number: text(body.phone, ad.phone), country_code: 'TZ', first_name: text(body.firstName, 'Customer'), last_name: text(body.lastName, 'User') } };
+    const data = await authorized('/api/Transactions/SubmitOrderRequest', await token(), { method: 'POST', body: JSON.stringify(payload) });
     const redirectUrl = data.redirect_url || data.redirectUrl;
     if (!redirectUrl) throw new Error('PesaPal returned no redirect URL.');
-    const ads = readAds(); writeAds(ads.map((item) => item.id === ad.id ? { ...item, orderReference, status: 'Awaiting payment' } : item));
-    res.json({ ok: true, orderId: data.order_tracking_id || data.orderTrackingId || orderReference, orderReference, redirect_url: redirectUrl });
-  } catch (error) { res.status(502).json({ ok: false, error: error.message || 'Payment request failed.' }); }
+    writeAds(readAds().map((item) => item.id === ad.id ? { ...item, orderReference: reference, status: 'Awaiting payment', packageType, packageAmount: amount } : item));
+    return res.json({ ok: true, orderId: data.order_tracking_id || data.orderTrackingId || reference, orderReference: reference, redirect_url: redirectUrl });
+  } catch (error) { return res.status(502).json({ ok: false, error: error.message || 'Payment request failed.' }); }
+});
+
+app.get('/api/pesapal/status', async (req, res) => {
+  const trackingId = text(req.query.OrderTrackingId || req.query.orderTrackingId);
+  if (!trackingId) return res.status(400).json({ error: 'Missing OrderTrackingId.' });
+  try { return res.json(await transactionStatus(trackingId)); } catch (error) { return res.status(502).json({ error: error.message }); }
 });
 
 async function paymentNotification(req, res) {
@@ -133,8 +131,8 @@ async function paymentNotification(req, res) {
   const trackingId = text(data.OrderTrackingId || data.order_tracking_id || data.orderTrackingId);
   const reference = text(data.OrderMerchantReference || data.order_merchant_reference || data.orderReference || data.order_reference);
   if (!trackingId || !reference) return res.status(400).send('Missing payment reference.');
-  try { await reconcilePayment(trackingId, reference); res.status(200).send('OK'); }
-  catch (error) { console.error('PesaPal verification failed:', error.message); res.status(502).send('Verification failed'); }
+  try { await verifyAndSave(trackingId, reference); return res.status(200).send('OK'); }
+  catch (error) { console.error('PesaPal verification failed:', error.message); return res.status(502).send('Verification failed'); }
 }
 app.get('/api/pesapal/callback', paymentNotification);
 app.post('/api/pesapal/callback', paymentNotification);
