@@ -24,9 +24,22 @@ jobs:
       - name: Prepare web assets
         run: mkdir -p www && cp index.html manifest.json sw.js icon-192.png icon-512.png icon.svg www/
       - name: Add Android platform
-        run: npx cap add android --no-sync
+        run: |
+          set +e
+          npx cap add android
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "Capacitor add android returned $status; recovering generated project..."
+            test -d android
+            mkdir -p android/app/src/main/assets
+            [ -f android/app/src/main/assets/capacitor.plugins.json ] || printf '[]\n' > android/app/src/main/assets/capacitor.plugins.json
+          fi
       - name: Sync Android
-        run: npx cap sync android
+        run: |
+          mkdir -p android/app/src/main/assets
+          [ -f android/app/src/main/assets/capacitor.plugins.json ] || printf '[]\n' > android/app/src/main/assets/capacitor.plugins.json
+          npx cap sync android
       - name: Build Android App Bundle
         working-directory: android
         run: ./gradlew bundleRelease
@@ -53,9 +66,18 @@ jobs:
       - name: Prepare web assets
         run: mkdir -p www && cp index.html manifest.json sw.js icon-192.png icon-512.png icon.svg www/
       - name: Add iOS platform
-        run: npx cap add ios --no-sync
+        run: |
+          set +e
+          npx cap add ios
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "Capacitor add ios returned $status; recovering generated project..."
+            test -d ios
+          fi
       - name: Sync iOS
-        run: npx cap sync ios
+        run: |
+          npx cap sync ios
       - name: Archive iOS project
         run: zip -r SokoAds-iOS-Xcode-Project.zip ios
       - name: Upload iOS project
