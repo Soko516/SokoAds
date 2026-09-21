@@ -1,0 +1,61 @@
+name: Build SokoAds Mobile Apps
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'manifest.json'
+      - 'capacitor.config.ts'
+      - 'package.json'
+      - '.github/workflows/mobile-build.yml'
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install
+      - name: Add Android platform
+        run: npx cap add android
+      - name: Sync Android
+        run: npx cap sync android
+      - name: Build Android App Bundle
+        working-directory: android
+        run: ./gradlew bundleRelease
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: SokoAds-Android-AAB
+          path: android/app/build/outputs/bundle/release/*.aab
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SokoAds-Android-APK
+          path: android/app/build/outputs/apk/debug/*.apk
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install
+      - name: Add iOS platform
+        run: npx cap add ios
+      - name: Sync iOS
+        run: npx cap sync ios
+      - name: Archive iOS project
+        run: zip -r SokoAds-iOS-Xcode-Project.zip ios
+      - name: Upload iOS project
+        uses: actions/upload-artifact@v4
+        with:
+          name: SokoAds-iOS-Xcode-Project
+          path: SokoAds-iOS-Xcode-Project.zip
