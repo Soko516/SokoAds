@@ -6,7 +6,7 @@
     "category": "Simu",
     "phone": "255700000001",
     "desc": "Simu ya Samsung Galaxy A15. Demo listing ya SokoAds kwa ajili ya kujaribu search na AI.",
-    "image": "",
+    "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Samsung_Galaxy_A15_5G_2024.jpg?width=800",
     "featured": true,
     "status": "Approved",
     "createdAt": "2026-09-21T08:00:00.000Z"
@@ -18,7 +18,7 @@
     "category": "Simu",
     "phone": "255700000002",
     "desc": "iPhone 11 64GB. Demo listing ya majaribio kwenye marketplace.",
-    "image": "",
+    "image": "https://commons.wikimedia.org/wiki/Special:FilePath/IPhone_11_all_color.jpg?width=800",
     "featured": true,
     "status": "Approved",
     "createdAt": "2026-09-21T08:05:00.000Z"
@@ -30,7 +30,7 @@
     "category": "Simu",
     "phone": "255700000003",
     "desc": "Tecno Spark 20. Demo listing ya kujaribu utafutaji wa bidhaa kwa bei.",
-    "image": "",
+    "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Samsung_Galaxy_A15_5G_2024.jpg?width=800",
     "featured": false,
     "status": "Approved",
     "createdAt": "2026-09-21T08:10:00.000Z"
@@ -42,7 +42,7 @@
     "category": "Kompyuta",
     "phone": "255700000004",
     "desc": "HP EliteBook 840 G5. Laptop ya demo kwa ajili ya kujaribu marketplace.",
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1538503529202-7a0e79cbb6f6?auto=format&fit=crop&w=1200&q=80",
     "featured": true,
     "status": "Approved",
     "createdAt": "2026-09-21T08:15:00.000Z"
@@ -54,7 +54,7 @@
     "category": "Kompyuta",
     "phone": "255700000005",
     "desc": "Lenovo ThinkPad T480. Demo listing ya SokoAds.",
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1538503529202-7a0e79cbb6f6?auto=format&fit=crop&w=1200&q=80",
     "featured": false,
     "status": "Approved",
     "createdAt": "2026-09-21T08:20:00.000Z"
@@ -66,7 +66,7 @@
     "category": "TV & Electronics",
     "phone": "255700000006",
     "desc": "Hisense 43 inch Smart TV. Demo listing ya majaribio.",
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1758577515339-93872db0d37e?auto=format&fit=crop&w=1200&q=80",
     "featured": true,
     "status": "Approved",
     "createdAt": "2026-09-21T08:25:00.000Z"
@@ -78,7 +78,7 @@
     "category": "Electronics",
     "phone": "255700000007",
     "desc": "JBL Bluetooth Speaker. Demo listing ya kujaribu AI product search.",
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1542483381-41a479b1fb88?auto=format&fit=crop&w=1200&q=80",
     "featured": false,
     "status": "Approved",
     "createdAt": "2026-09-21T08:30:00.000Z"
@@ -90,7 +90,7 @@
     "category": "Samani",
     "phone": "255700000008",
     "desc": "Sofa set ya watu 5. Demo listing kwa marketplace.",
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1688372460353-d659e4fb64e7?auto=format&fit=crop&w=1200&q=80",
     "featured": true,
     "status": "Approved",
     "createdAt": "2026-09-21T08:35:00.000Z"
@@ -102,7 +102,7 @@
     "category": "Mavazi",
     "phone": "255700000009",
     "desc": "Men's sneakers. Demo listing ya SokoAds.",
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1778521157912-620fd0d3c6e1?auto=format&fit=crop&w=1200&q=80",
     "featured": false,
     "status": "Approved",
     "createdAt": "2026-09-21T08:40:00.000Z"
@@ -114,7 +114,7 @@
     "category": "Mavazi",
     "phone": "255700000010",
     "desc": "Ladies handbag. Demo listing ya majaribio.",
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1663222695787-855b80d8e2cf?auto=format&fit=crop&w=1200&q=80",
     "featured": false,
     "status": "Approved",
     "createdAt": "2026-09-21T08:45:00.000Z"
@@ -126,7 +126,7 @@
     "category": "Nyumbani",
     "phone": "255700000011",
     "desc": "Blender 1.5L. Demo listing kwa ajili ya search na AI.",
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1685131699848-b5685f83f96d?auto=format&fit=crop&w=1200&q=80",
     "featured": false,
     "status": "Approved",
     "createdAt": "2026-09-21T08:50:00.000Z"
@@ -138,7 +138,7 @@
     "category": "Usafiri",
     "phone": "255700000012",
     "desc": "Mountain bicycle. Demo listing ya SokoAds.",
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1681295687244-a5d2c0994cc1?auto=format&fit=crop&w=1200&q=80",
     "featured": false,
     "status": "Approved",
     "createdAt": "2026-09-21T08:55:00.000Z"
