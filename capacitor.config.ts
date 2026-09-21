@@ -3,7 +3,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'tz.sokoads.app',
   appName: 'SokoAds',
-  webDir: '.',
+  webDir: 'www',
   server: {
     url: 'https://sokoads.onrender.com',
     cleartext: false
