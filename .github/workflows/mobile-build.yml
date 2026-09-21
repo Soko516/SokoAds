@@ -13,6 +13,8 @@ on:
       - 'icon.svg'
       - 'capacitor.config.ts'
       - 'package.json'
+      - 'ai.js'
+      - 'server.js'
       - '.github/workflows/mobile-build.yml'
 
 permissions:
