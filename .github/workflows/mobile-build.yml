@@ -21,8 +21,8 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: npm install
-      - name: Prepare Capacitor Android assets directory
-        run: mkdir -p android/app/src/main/assets
+      - name: Prepare web assets
+        run: mkdir -p www && cp index.html manifest.json sw.js icon-192.png icon-512.png icon.svg www/
       - name: Add Android platform
         run: npx cap add android
       - name: Sync Android
@@ -50,8 +50,8 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: npm install
-      - name: Prepare Capacitor iOS platform directory
-        run: mkdir -p ios
+      - name: Prepare web assets
+        run: mkdir -p www && cp index.html manifest.json sw.js icon-192.png icon-512.png icon.svg www/
       - name: Add iOS platform
         run: npx cap add ios
       - name: Sync iOS
