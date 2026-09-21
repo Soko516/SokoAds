@@ -116,7 +116,8 @@ async function verifyAndSave(trackingId, reference) {
 }
 
 app.disable('x-powered-by');
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '6mb' }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.get('/health', (req, res) => res.json({
   ok: true,
@@ -148,6 +149,27 @@ app.post('/api/ai/write-ad', async (req, res) => {
 
 app.get('/api/ads', (req, res) => {
   res.json(readAds().map(({ paymentStatus: _, ...ad }) => ad));
+});
+
+
+app.post('/api/upload-image', (req, res) => {
+  try {
+    const dataUrl = text(req.body?.dataUrl);
+    if (!dataUrl || !/^data:image\/(jpeg|jpg|png|webp);base64,/i.test(dataUrl)) {
+      return res.status(400).json({ error: 'Tuma picha ya JPG, PNG au WebP.' });
+    }
+    const match = dataUrl.match(/^data:image\/(jpeg|jpg|png|webp);base64,(.+)$/i);
+    const ext = match[1].toLowerCase() === 'jpg' ? 'jpg' : match[1].toLowerCase();
+    const buffer = Buffer.from(match[2], 'base64');
+    if (buffer.length > 2 * 1024 * 1024) return res.status(413).json({ error: 'Picha ni kubwa sana. Tumia picha chini ya 2MB.' });
+    const uploadDir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+    const filename = `product-${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+    fs.writeFileSync(path.join(uploadDir, filename), buffer);
+    return res.status(201).json({ ok: true, url: `/uploads/${filename}` });
+  } catch (error) {
+    return res.status(500).json({ error: 'Imeshindikana kuhifadhi picha.' });
+  }
 });
 
 app.post('/api/ads', (req, res) => {
