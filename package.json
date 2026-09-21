@@ -1,10 +1,23 @@
 {
   "name": "sokoads-pesapal",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
-  "description": "SokoAds marketplace with Pesapal API 3.0 integration",
+  "description": "SokoAds marketplace with PesaPal and mobile app builds",
   "main": "server.js",
-  "scripts": {"start":"node server.js","dev":"node server.js"},
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "mobile:sync": "npx cap sync",
+    "mobile:android": "npx cap add android && npx cap sync android",
+    "mobile:ios": "npx cap add ios && npx cap sync ios"
+  },
   "engines": {"node": ">=18"},
-  "dependencies": {"dotenv":"^16.4.7","express":"^4.21.2"}
+  "dependencies": {
+    "@capacitor/core": "^8.0.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.0"
+  }
 }
