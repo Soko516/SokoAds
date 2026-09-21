@@ -2,9 +2,8 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
-const ai = require('./ai');
-
 dotenv.config();
+const ai = require('./ai');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
