@@ -89,9 +89,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-audit --no-fund
       - name: Prepare web assets
         run: |
           set -e
@@ -104,30 +103,23 @@ jobs:
           status=$?
           set -e
           if [ "$status" -ne 0 ]; then
-            echo "cap add ios returned $status; checking generated project"
+            echo "cap add ios returned $status; recovering generated project"
             test -d ios
           fi
       - name: Sync iOS
-        run: npx cap sync ios
-      - name: Build unsigned iOS archive
         run: |
           set -e
-          WORKSPACE=$(find ios/App -maxdepth 1 -name '*.xcworkspace' -print -quit)
-          PROJECT=$(find ios/App -maxdepth 1 -name '*.xcodeproj' -print -quit)
-          if [ -n "$WORKSPACE" ]; then
-            xcodebuild -workspace "$WORKSPACE" -scheme App -configuration Release -sdk iphoneos -archivePath "$RUNNER_TEMP/SokoAds.xcarchive" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive
-          else
-            xcodebuild -project "$PROJECT" -scheme App -configuration Release -sdk iphoneos -archivePath "$RUNNER_TEMP/SokoAds.xcarchive" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive
-          fi
-          ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/SokoAds.xcarchive" SokoAds-iOS-Unsigned.xcarchive.zip
-      - name: Upload iOS unsigned archive
-        uses: actions/upload-artifact@v4
-        with:
-          name: SokoAds-iOS-Unsigned-Archive
-          path: SokoAds-iOS-Unsigned.xcarchive.zip
-          if-no-files-found: error
+          mkdir -p ios/App/App/public
+          npx cap sync ios
+      - name: Validate iOS Xcode project
+        working-directory: ios/App
+        run: |
+          set -e
+          xcodebuild -list
+          xcodebuild -project App.xcodeproj -scheme App -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
       - name: Upload iOS Xcode project
         uses: actions/upload-artifact@v4
         with:
           name: SokoAds-iOS-Xcode-Project
           path: ios
+          if-no-files-found: error
