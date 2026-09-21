@@ -1,6 +1,6 @@
 {
   "name": "sokoads-pesapal",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "private": true,
   "description": "SokoAds marketplace with PesaPal and mobile app builds",
   "main": "server.js",
@@ -20,6 +20,7 @@
     "express": "^4.21.2"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.0.0"
+    "@capacitor/cli": "^8.0.0",
+    "typescript": "^5.9.2"
   }
 }
