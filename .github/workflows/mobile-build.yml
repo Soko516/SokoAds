@@ -23,12 +23,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-audit --no-fund
+      - name: Validate mobile inputs
+        run: |
+          test -f index.html
+          test -f manifest.json
+          test -f sw.js
+          test -f icon-192.png
+          test -f icon-512.png
+          test -f icon.svg
+          test -f capacitor.config.ts
       - name: Prepare web assets
         run: |
           set -e
