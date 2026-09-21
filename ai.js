@@ -7,31 +7,55 @@ function clean(value, fallback='') {
 
 function localChat(message, ads=[]) {
   const q = clean(message).toLowerCase();
-  const budgetMatch = q.match(/(?:chini ya|under|less than|hadi)\s*(?:tsh\s*)?([\d,\.]+)/i);
+
+  // Tanzanian-friendly budget parsing: 500000, 500,000 or 500.000
+  const budgetMatch = q.match(/(?:chini ya|under|less than|hadi|kwa)s*(?:tsh|tzs)?s*([\d,\.]+)/i);
   const budget = budgetMatch ? Number(budgetMatch[1].replace(/[,\.]/g, '')) : null;
-  const words = q.split(/\s+/).filter(Boolean);
+
+  // Ignore common search words so the catalog match is based on the actual product/category.
+  const stopWords = new Set([
+    'natafuta','tafuta','nina','nahitaji','nataka','chini','hadi','kwa','bei',
+    'ya','na','the','a','an','under','less','than','tsh','tzs','shilingi',
+    'ni','je','please','pls'
+  ]);
+  const words = q.split(/\s+/)
+    .map(w => w.replace(/[^\p{L}\p{N}]/gu, ''))
+    .filter(w => w.length >= 3 && !stopWords.has(w));
+
   const results = ads.filter(a => {
-    const hay = [a.name, a.category, a.desc].map(v => String(v || '').toLowerCase()).join(' ');
-    const matchesWord = words.some(w => w.length >= 3 && hay.includes(w));
-    const matchesBudget = budget == null || (Number(a.price) > 0 && Number(a.price) <= budget);
+    const hay = [a.name, a.category, a.desc]
+      .map(v => String(v || '').toLowerCase())
+      .join(' ');
+
+    const matchesWord = words.length === 0 || words.some(w => hay.includes(w));
+    const matchesBudget = budget == null ||
+      (Number(a.price) > 0 && Number(a.price) <= budget);
+
     return matchesWord && matchesBudget;
   }).slice(0, 5);
 
   if (results.length) {
     return 'Nimepata hizi bidhaa kwenye SokoAds:\n' +
-      results.map((a, i) => `${i + 1}. ${a.name} — TSh ${Number(a.price || 0).toLocaleString('en-TZ')}${a.category ? ' (' + a.category + ')' : ''}`).join('\n') +
+      results.map((a, i) =>
+        `${i + 1}. ${a.name} — TSh ${Number(a.price || 0).toLocaleString('en-TZ')}${a.category ? ' (' + a.category + ')' : ''}`
+      ).join('\n') +
       '\n\nUnaweza kutumia search ya Marketplace kuona tangazo kamili.';
   }
 
-  if (/habari|hello|hi|mambo|vipi/.test(q)) {
+  // Use word boundaries: "chini" must not accidentally match "hi".
+  if (/\b(habari|hello|hi|mambo|vipi|hey)\b/i.test(q)) {
     return 'Habari! 👋 Mimi ni SokoAds AI. Naweza kukusaidia kutafuta bidhaa kwenye catalog au kuboresha tangazo lako.';
   }
 
-  if (/tangazo|advert|maelezo|description/.test(q)) {
+  if (/\b(tangazo|advert|maelezo|description|andika)\b/i.test(q)) {
     return 'Ninaweza kukusaidia kuboresha tangazo. Andika jina la bidhaa, bei na maelezo yake kwenye sehemu ya “Weka Tangazo”, kisha bonyeza “AI Andika Maelezo”.';
   }
 
-  return 'Kwa sasa SokoAds AI iko kwenye hali ya msingi kwa sababu huduma ya AI ya mtandaoni haina credits. Bado naweza kukusaidia kutafuta bidhaa zilizopo kwenye SokoAds. Jaribu mfano: “Natafuta simu chini ya TSh 500,000”.';
+  if (budget != null || /\b(natafuta|tafuta|nahitaji|nataka)\b/i.test(q)) {
+    return 'Sijaona bidhaa inayolingana kwenye catalog kwa masharti hayo. Jaribu jina la bidhaa au category nyingine, kwa mfano: “Natafuta simu chini ya TSh 500,000”.';
+  }
+
+  return 'Niko tayari kukusaidia kwenye SokoAds. Unaweza kuniuliza kutafuta bidhaa au kuboresha tangazo, kwa mfano: “Natafuta simu chini ya TSh 500,000”.';
 }
 
 async function openai(prompt) {
