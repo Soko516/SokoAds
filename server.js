@@ -4,6 +4,7 @@ const path = require('path');
 const dotenv = require('dotenv');
 dotenv.config();
 const ai = require('./ai');
+const havana = require('./havana-ai');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -118,6 +119,20 @@ async function verifyAndSave(trackingId, reference) {
 app.disable('x-powered-by');
 app.use(express.json({ limit: '6mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+app.get('/havana', (req, res) => res.sendFile(path.join(__dirname, 'havana-ai.html')));
+
+app.post('/api/havana/search', async (req, res) => {
+  try {
+    if (req.body?.adultConfirmed !== true) return res.status(403).json({ error: '18+ confirmation is required.' });
+    const query = text(req.body?.query);
+    if (!query) return res.status(400).json({ error: 'Query is required.' });
+    const answer = await havana.search(query);
+    res.json({ ok: true, answer });
+  } catch (error) {
+    res.status(error.status || 500).json({ ok: false, error: error.message });
+  }
+});
 
 app.get('/health', (req, res) => res.json({
   ok: true,
