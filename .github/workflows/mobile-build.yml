@@ -7,9 +7,16 @@ on:
     paths:
       - 'index.html'
       - 'manifest.json'
+      - 'sw.js'
+      - 'icon-192.png'
+      - 'icon-512.png'
+      - 'icon.svg'
       - 'capacitor.config.ts'
       - 'package.json'
       - '.github/workflows/mobile-build.yml'
+
+permissions:
+  contents: read
 
 jobs:
   android:
@@ -18,11 +25,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 22
+          cache: npm
       - name: Install dependencies
         run: npm install
       - name: Prepare web assets
-        run: mkdir -p www && cp index.html manifest.json sw.js icon-192.png icon-512.png icon.svg www/
+        run: |
+          set -e
+          mkdir -p www
+          cp index.html manifest.json sw.js icon-192.png icon-512.png icon.svg www/
       - name: Add Android platform
         run: |
           set +e
@@ -30,7 +41,7 @@ jobs:
           status=$?
           set -e
           if [ "$status" -ne 0 ]; then
-            echo "Capacitor add android returned $status; recovering generated project..."
+            echo "cap add android returned $status; checking generated project"
             test -d android
             mkdir -p android/app/src/main/assets
             [ -f android/app/src/main/assets/capacitor.plugins.json ] || printf '[]\n' > android/app/src/main/assets/capacitor.plugins.json
@@ -40,19 +51,24 @@ jobs:
           mkdir -p android/app/src/main/assets
           [ -f android/app/src/main/assets/capacitor.plugins.json ] || printf '[]\n' > android/app/src/main/assets/capacitor.plugins.json
           npx cap sync android
-      - name: Build Android App Bundle
+      - name: Build Android release AAB
         working-directory: android
-        run: ./gradlew bundleRelease
-      - name: Upload AAB
+        run: ./gradlew bundleRelease --no-daemon
+      - name: Build Android debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Upload Android AAB
         uses: actions/upload-artifact@v4
         with:
           name: SokoAds-Android-AAB
           path: android/app/build/outputs/bundle/release/*.aab
-      - name: Upload debug APK
+          if-no-files-found: error
+      - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: SokoAds-Android-APK
           path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
 
   ios:
     runs-on: macos-latest
@@ -60,11 +76,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 22
+          cache: npm
       - name: Install dependencies
         run: npm install
       - name: Prepare web assets
-        run: mkdir -p www && cp index.html manifest.json sw.js icon-192.png icon-512.png icon.svg www/
+        run: |
+          set -e
+          mkdir -p www
+          cp index.html manifest.json sw.js icon-192.png icon-512.png icon.svg www/
       - name: Add iOS platform
         run: |
           set +e
@@ -72,16 +92,30 @@ jobs:
           status=$?
           set -e
           if [ "$status" -ne 0 ]; then
-            echo "Capacitor add ios returned $status; recovering generated project..."
+            echo "cap add ios returned $status; checking generated project"
             test -d ios
           fi
       - name: Sync iOS
+        run: npx cap sync ios
+      - name: Build unsigned iOS archive
         run: |
-          npx cap sync ios
-      - name: Archive iOS project
-        run: zip -r SokoAds-iOS-Xcode-Project.zip ios
-      - name: Upload iOS project
+          set -e
+          WORKSPACE=$(find ios/App -maxdepth 1 -name '*.xcworkspace' -print -quit)
+          PROJECT=$(find ios/App -maxdepth 1 -name '*.xcodeproj' -print -quit)
+          if [ -n "$WORKSPACE" ]; then
+            xcodebuild -workspace "$WORKSPACE" -scheme App -configuration Release -sdk iphoneos -archivePath "$RUNNER_TEMP/SokoAds.xcarchive" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive
+          else
+            xcodebuild -project "$PROJECT" -scheme App -configuration Release -sdk iphoneos -archivePath "$RUNNER_TEMP/SokoAds.xcarchive" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive
+          fi
+          ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/SokoAds.xcarchive" SokoAds-iOS-Unsigned.xcarchive.zip
+      - name: Upload iOS unsigned archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: SokoAds-iOS-Unsigned-Archive
+          path: SokoAds-iOS-Unsigned.xcarchive.zip
+          if-no-files-found: error
+      - name: Upload iOS Xcode project
         uses: actions/upload-artifact@v4
         with:
           name: SokoAds-iOS-Xcode-Project
-          path: SokoAds-iOS-Xcode-Project.zip
+          path: ios
