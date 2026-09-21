@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
+const ai = require('./ai');
 
 dotenv.config();
 
@@ -125,6 +126,26 @@ app.get('/health', (req, res) => res.json({
   paymentConfigured: Boolean(process.env.PESAPAL_CONSUMER_KEY && process.env.PESAPAL_CONSUMER_SECRET),
   ipnConfigured: Boolean(process.env.PESAPAL_IPN_ID)
 }));
+
+app.post('/api/ai/chat', async (req, res) => {
+  try {
+    const message = text(req.body?.message);
+    if (!message) return res.status(400).json({ error: 'Message is required.' });
+    const answer = await ai.chat(message, readAds());
+    res.json({ ok:true, answer });
+  } catch (error) {
+    res.status(error.status || 500).json({ ok:false, error:error.message });
+  }
+});
+
+app.post('/api/ai/write-ad', async (req, res) => {
+  try {
+    const result = await ai.writeAd(req.body || {});
+    res.json({ ok:true, result });
+  } catch (error) {
+    res.status(error.status || 500).json({ ok:false, error:error.message });
+  }
+});
 
 app.get('/api/ads', (req, res) => {
   res.json(readAds().map(({ paymentStatus: _, ...ad }) => ad));
