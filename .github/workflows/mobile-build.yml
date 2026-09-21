@@ -24,7 +24,7 @@ jobs:
       - name: Prepare web assets
         run: mkdir -p www && cp index.html manifest.json sw.js icon-192.png icon-512.png icon.svg www/
       - name: Add Android platform
-        run: npx cap add android
+        run: npx cap add android --no-sync
       - name: Sync Android
         run: npx cap sync android
       - name: Build Android App Bundle
@@ -53,7 +53,7 @@ jobs:
       - name: Prepare web assets
         run: mkdir -p www && cp index.html manifest.json sw.js icon-192.png icon-512.png icon.svg www/
       - name: Add iOS platform
-        run: npx cap add ios
+        run: npx cap add ios --no-sync
       - name: Sync iOS
         run: npx cap sync ios
       - name: Archive iOS project
